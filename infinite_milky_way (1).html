@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Infinite Milky Way</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+            pointer-events: none;
+            line-height: 1.6;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .status {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.6);
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .credits {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.5);
+            font-size: 11px;
+            pointer-events: none;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        🖱️ <strong>Mouse:</strong> Move to attract stars, Click for ripples<br>
+        ⌨️ <strong>SPACE:</strong> Toggle constellation lines<br>
+        ⌨️ <strong>R:</strong> Regenerate cosmic region<br>
+        ⌨️ <strong>T:</strong> Time warp effect<br>
+        ⌨️ <strong>C:</strong> Clear all effects
+    </div>
+    <div class="status" id="status">Stars: 0 | Particles: 0 | Ripples: 0</div>
+    <div class="credits">Created by: Bright Kofi Akowuah [Breezy ArtDrop Studio]</div>
+    
+    <script>
+        // Configuration
+        const CONFIG = {
+            STAR_COUNT: 1800,
+            MILKY_WAY_PARTICLES: 3500,
+            NEBULA_CLOUDS: 5,
+            MOUSE_INFLUENCE_RADIUS: 180,
+            GRAVITY_STRENGTH: 0.8,
+            TIME_SPEED: 0.012
+        };
+        
+        // Global state
+        let cosmicTime = 0;
+        let universeAge = 0;
+        
+        // Objects
+        let stars = [];
+        let milkyWayParticles = [];
+        let nebulaClouds = [];
+        let ripples = [];
+        let constellationLines = [];
+        
+        // Interaction state
+        let mouseInfluence = { x: 0, y: 0, strength: 0 };
+        let showConstellations = false;
+        let timeWarpActive = false;
+        
+        function setup() {
+            createCanvas(1920, 1080);
+            colorMode(HSB, 360, 100, 100, 1);
+            
+            initializeUniverse();
+            console.log("Universe initialized!");
+        }
+        
+        function initializeUniverse() {
+            // Clear existing objects
+            stars = [];
+            milkyWayParticles = [];
+            nebulaClouds = [];
+            ripples = [];
+            constellationLines = [];
+            
+            // Create stars with proper initialization
+            for (let i = 0; i < CONFIG.STAR_COUNT; i++) {
+                stars.push(createStar());
+            }
+            
+            // Create Milky Way particles
+            for (let i = 0; i < CONFIG.MILKY_WAY_PARTICLES; i++) {
+                milkyWayParticles.push(createMilkyWayParticle());
+            }
+            
+            // Create nebula clouds
+            for (let i = 0; i < CONFIG.NEBULA_CLOUDS; i++) {
+                nebulaClouds.push(createNebulaCloud());
+            }
+            
+            updateStatus();
+        }
+        
+        function createStar() {
+            return {
+                x: random(-100, width + 100),
+                y: random(-100, height + 100),
+                originalX: 0,
+                originalY: 0,
+                baseSize: random(0.8, 3.5),
+                brightness: random(0.4, 1),
+                depth: random(0.3, 1),
+                velocity: { x: random(-0.02, 0.02), y: random(-0.015, 0.015) },
+                twinkleSpeed: random(0.015, 0.04),
+                pulseSpeed: random(0.008, 0.02),
+                noiseOffsetX: random(10000),
+                noiseOffsetY: random(10000),
+                hue: random([0, 45, 200, 240, 280, 320]),
+                saturation: random(30, 70),
+                temperature: random(0.2, 1),
+                affected: false
+            };
+        }
+        
+        function createMilkyWayParticle() {
+            // Create diagonal Milky Way band
+            let angle = radians(-25);
+            let centerX = width * 0.5;
+            let centerY = height * 0.5;
+            
+            let bandLength = width * 2;
+            let bandWidth = 400;
+            
+            let localX = random(-bandLength/2, bandLength/2);
+            let localY = (pow(random(), 2) - 0.5) * bandWidth;
+            if (random() > 0.5) localY *= -1;
+            
+            let x = centerX + localX * cos(angle) - localY * sin(angle);
+            let y = centerY + localX * sin(angle) + localY * cos(angle);
+            
+            let distanceFromCore = abs(localY) / (bandWidth/2);
+            let density = 1 - pow(distanceFromCore, 1.5);
+            
+            return {
+                x: x,
+                y: y,
+                baseSize: random(0.3, 1.2) * density,
+                alpha: random(0.05, 0.25) * density,
+                depth: random(0.4, 0.9),
+                velocity: { x: random(-0.008, 0.008), y: random(-0.006, 0.006) },
+                hue: random(220, 300),
+                saturation: random(60, 85),
+                brightness: random(75, 95),
+                noiseOffset: random(10000),
+                evolutionSpeed: random(0.003, 0.008)
+            };
+        }
+        
+        function createNebulaCloud() {
+            return {
+                x: random(width),
+                y: random(height),
+                baseSize: random(300, 600),
+                alpha: random(0.015, 0.04),
+                depth: random(0.2, 0.8),
+                velocity: { x: random(-0.012, 0.012), y: random(-0.01, 0.01) },
+                hue: random(240, 300),
+                noiseOffsetX: random(10000),
+                noiseOffsetY: random(10000),
+                breathingSpeed: random(0.004, 0.012),
+                colorShiftSpeed: random(0.002, 0.006)
+            };
+        }
+        
+        function draw() {
+            // Update time
+            let timeMultiplier = timeWarpActive ? random(0.5, 3) : 1;
+            cosmicTime += CONFIG.TIME_SPEED * timeMultiplier;
+            universeAge += 0.0003;
+            
+            // Background
+            drawCosmicBackground();
+            
+            // Draw all elements in proper order
+            drawNebulae();
+            drawMilkyWayBand();
+            drawStarField();
+            drawRipples();
+            drawConstellationLines();
+            
+            // Update interactions
+            updateMouseInfluence();
+            updateRipples();
+            updateConstellationLines();
+            
+            // Status update
+            if (frameCount % 60 === 0) {
+                updateStatus();
+            }
+            
+            // Subtle motion blur
+            fill(0, 0, 0, 0.008);
+            noStroke();
+            rect(0, 0, width, height);
+        }
+        
+        function drawCosmicBackground() {
+            let colorShift = sin(universeAge * 0.4) * 12;
+            
+            for (let y = 0; y < height; y += 4) {
+                let gradient = map(y, 0, height, 0, 1);
+                let hue1 = 240 + colorShift;
+                let hue2 = 260 + colorShift;
+                
+                let topColor = color(hue1, 95, 4);
+                let bottomColor = color(hue2, 75, 10);
+                
+                stroke(lerpColor(topColor, bottomColor, gradient));
+                strokeWeight(4);
+                line(0, y, width, y);
+            }
+            noStroke();
+        }
+        
+        function drawNebulae() {
+            for (let cloud of nebulaClouds) {
+                // Movement
+                cloud.x += cloud.velocity.x * cloud.depth;
+                cloud.y += cloud.velocity.y * cloud.depth;
+                
+                // Breathing effect
+                let breathe = noise(cosmicTime * cloud.breathingSpeed + cloud.noiseOffsetX);
+                let size = cloud.baseSize * (0.6 + 0.8 * breathe);
+                
+                // Color evolution
+                let hue = cloud.hue + sin(cosmicTime * cloud.colorShiftSpeed) * 30;
+                let alpha = cloud.alpha * (0.7 + 0.3 * sin(cosmicTime + cloud.noiseOffsetY));
+                
+                // Draw soft gradient cloud
+                drawSoftGradient(cloud.x, cloud.y, size, hue, alpha);
+                
+                // Wrap around screen
+                wrapObject(cloud);
+            }
+        }
+        
+        function drawSoftGradient(x, y, size, hue, alpha) {
+            let layers = 8;
+            for (let i = layers; i > 0; i--) {
+                let layerAlpha = alpha * (1 - i/layers) * 0.5;
+                let layerSize = size * (i/layers);
+                
+                fill(hue, 65, 80, layerAlpha);
+                noStroke();
+                ellipse(x, y, layerSize, layerSize);
+            }
+        }
+        
+        function drawMilkyWayBand() {
+            for (let particle of milkyWayParticles) {
+                // Movement
+                particle.x += particle.velocity.x * particle.depth;
+                particle.y += particle.velocity.y * particle.depth;
+                
+                // Size animation
+                let sizePulse = noise(cosmicTime * 0.4 + particle.noiseOffset);
+                let size = particle.baseSize * (0.4 + 1.2 * sizePulse);
+                
+                // Color evolution
+                let hue = particle.hue + sin(cosmicTime * particle.evolutionSpeed) * 25;
+                let alpha = particle.alpha * (0.6 + 0.4 * sin(cosmicTime * 2 + particle.noiseOffset));
+                
+                // Depth affects opacity
+                alpha *= particle.depth;
+                
+                fill(hue, particle.saturation, particle.brightness, alpha);
+                noStroke();
+                ellipse(particle.x, particle.y, size, size);
+                
+                wrapObject(particle);
+            }
+        }
+        
+        function drawStarField() {
+            for (let star of stars) {
+                // Natural movement
+                star.x += star.velocity.x * star.depth;
+                star.y += star.velocity.y * star.depth;
+                
+                // Perlin noise for organic movement
+                let noiseX = (noise(cosmicTime * 0.15 + star.noiseOffsetX) - 0.5) * 4;
+                let noiseY = (noise(cosmicTime * 0.15 + star.noiseOffsetY) - 0.5) * 4;
+                
+                // Mouse gravity effect
+                let mouseDistance = dist(star.x, star.y, mouseInfluence.x, mouseInfluence.y);
+                
+                if (mouseDistance < CONFIG.MOUSE_INFLUENCE_RADIUS && mouseDistance > 0) {
+                    let force = map(mouseDistance, 0, CONFIG.MOUSE_INFLUENCE_RADIUS, CONFIG.GRAVITY_STRENGTH, 0);
+                    force *= mouseInfluence.strength;
+                    
+                    let angle = atan2(mouseInfluence.y - star.y, mouseInfluence.x - star.x);
+                    noiseX += cos(angle) * force;
+                    noiseY += sin(angle) * force;
+                    
+                    star.affected = true;
+                } else {
+                    star.affected = false;
+                }
+                
+                let drawX = star.x + noiseX;
+                let drawY = star.y + noiseY;
+                
+                // Twinkling animation
+                let twinkle = sin(cosmicTime * star.twinkleSpeed * 40 + star.noiseOffsetX);
+                let pulse = sin(cosmicTime * star.pulseSpeed * 20 + star.noiseOffsetY);
+                let brightness = star.brightness * (0.4 + 0.4 * twinkle + 0.2 * pulse);
+                
+                // Size with depth
+                let size = star.baseSize * (0.5 + 0.5 * pulse) * star.depth;
+                
+                // Color temperature variation
+                let tempShift = sin(cosmicTime * 0.003 + star.temperature) * 20;
+                let hue = star.hue + tempShift;
+                
+                // Draw main star
+                let alpha = brightness * star.depth;
+                fill(hue, star.saturation, 95, alpha);
+                noStroke();
+                ellipse(drawX, drawY, size, size);
+                
+                // Bright star effects
+                if (brightness > 0.7 && size > 2.5) {
+                    drawStarSpikes(drawX, drawY, size, hue, alpha * 0.6);
+                }
+                
+                // Highlight affected stars
+                if (star.affected) {
+                    stroke(hue, 40, 90, alpha * 0.3);
+                    strokeWeight(1);
+                    noFill();
+                    ellipse(drawX, drawY, size * 2.5, size * 2.5);
+                    noStroke();
+                }
+                
+                wrapObject(star);
+            }
+        }
+        
+        function drawStarSpikes(x, y, size, hue, alpha) {
+            stroke(hue, 20, 95, alpha);
+            strokeWeight(1);
+            let spikeLength = size * 6;
+            
+            // Horizontal spike
+            line(x - spikeLength, y, x + spikeLength, y);
+            // Vertical spike
+            line(x, y - spikeLength, x, y + spikeLength);
+            
+            noStroke();
+        }
+        
+        function drawRipples() {
+            for (let ripple of ripples) {
+                let alpha = ripple.life * ripple.strength * 0.5;
+                
+                // Outer ring
+                stroke(280, 80, 90, alpha);
+                strokeWeight(2);
+                noFill();
+                ellipse(ripple.x, ripple.y, ripple.radius * 2, ripple.radius * 2);
+                
+                // Middle ring
+                stroke(280, 60, 95, alpha * 0.7);
+                strokeWeight(1);
+                ellipse(ripple.x, ripple.y, ripple.radius * 1.4, ripple.radius * 1.4);
+                
+                // Inner glow
+                fill(280, 40, 95, alpha * 0.2);
+                noStroke();
+                ellipse(ripple.x, ripple.y, ripple.radius * 0.8, ripple.radius * 0.8);
+            }
+            noStroke();
+        }
+        
+        function drawConstellationLines() {
+            for (let line of constellationLines) {
+                if (line.alpha > 0) {
+                    stroke(50, 50, 85, line.alpha);
+                    strokeWeight(1.5);
+                    line(line.star1.x, line.star1.y, line.star2.x, line.star2.y);
+                    
+                    // Add small dots at connection points
+                    fill(50, 30, 95, line.alpha * 0.8);
+                    noStroke();
+                    ellipse(line.star1.x, line.star1.y, 3, 3);
+                    ellipse(line.star2.x, line.star2.y, 3, 3);
+                }
+            }
+            noStroke();
+        }
+        
+        function updateMouseInfluence() {
+            // Smooth mouse tracking
+            mouseInfluence.x = lerp(mouseInfluence.x, mouseX, 0.1);
+            mouseInfluence.y = lerp(mouseInfluence.y, mouseY, 0.1);
+            
+            // Update strength based on mouse movement
+            let mouseSpeed = dist(mouseX, mouseY, pmouseX, pmouseY);
+            if (mouseSpeed > 1) {
+                mouseInfluence.strength = lerp(mouseInfluence.strength, 1, 0.15);
+            } else {
+                mouseInfluence.strength *= 0.92;
+            }
+        }
+        
+        function updateRipples() {
+            for (let i = ripples.length - 1; i >= 0; i--) {
+                let ripple = ripples[i];
+                ripple.radius += ripple.speed;
+                ripple.life -= ripple.decay;
+                
+                if (ripple.life <= 0 || ripple.radius > ripple.maxRadius) {
+                    ripples.splice(i, 1);
+                }
+            }
+        }
+        
+        function updateConstellationLines() {
+            for (let i = constellationLines.length - 1; i >= 0; i--) {
+                let line = constellationLines[i];
+                
+                // Fade in/out animation
+                if (showConstellations && line.alpha < line.targetAlpha) {
+                    line.alpha += 0.025;
+                } else if (!showConstellations) {
+                    line.alpha -= 0.02;
+                }
+                
+                line.life--;
+                
+                if (line.life <= 0 || line.alpha <= 0) {
+                    constellationLines.splice(i, 1);
+                }
+            }
+        }
+        
+        function wrapObject(obj) {
+            let margin = 150;
+            if (obj.x < -margin) obj.x = width + margin;
+            if (obj.x > width + margin) obj.x = -margin;
+            if (obj.y < -margin) obj.y = height + margin;
+            if (obj.y > height + margin) obj.y = -margin;
+        }
+        
+        function updateStatus() {
+            document.getElementById('status').textContent = 
+                `Stars: ${stars.length} | Particles: ${milkyWayParticles.length} | Ripples: ${ripples.length}`;
+        }
+        
+        // EVENT HANDLERS
+        function mousePressed() {
+            // Create ripple effect
+            ripples.push({
+                x: mouseX,
+                y: mouseY,
+                radius: 0,
+                maxRadius: random(120, 200),
+                speed: random(2, 4),
+                strength: random(0.7, 1),
+                life: 1,
+                decay: random(0.01, 0.025)
+            });
+            
+            // Time perturbation
+            cosmicTime += random(-0.08, 0.08);
+            
+            // Create constellation with higher probability
+            if (random() < 0.6) {
+                createConstellation(mouseX, mouseY);
+            }
+            
+            console.log("Mouse pressed - Ripple created");
+        }
+        
+        function createConstellation(centerX, centerY) {
+            let nearbyStars = [];
+            let searchRadius = 100;
+            
+            // Find nearby stars
+            for (let star of stars) {
+                let distance = dist(star.x, star.y, centerX, centerY);
+                if (distance < searchRadius) {
+                    nearbyStars.push({ star: star, distance: distance });
+                }
+            }
+            
+            // Sort by distance and take closest ones
+            nearbyStars.sort((a, b) => a.distance - b.distance);
+            nearbyStars = nearbyStars.slice(0, min(6, nearbyStars.length));
+            
+            // Create constellation lines
+            if (nearbyStars.length >= 3) {
+                for (let i = 0; i < nearbyStars.length - 1; i++) {
+                    constellationLines.push({
+                        star1: nearbyStars[i].star,
+                        star2: nearbyStars[i + 1].star,
+                        alpha: 0,
+                        targetAlpha: 0.6,
+                        life: 500
+                    });
+                }
+                
+                // Connect last to first for closed shape
+                if (nearbyStars.length > 3) {
+                    constellationLines.push({
+                        star1: nearbyStars[nearbyStars.length - 1].star,
+                        star2: nearbyStars[0].star,
+                        alpha: 0,
+                        targetAlpha: 0.4,
+                        life: 500
+                    });
+                }
+                
+                console.log(`Constellation created with ${nearbyStars.length} stars`);
+            }
+        }
+        
+        function keyPressed() {
+            console.log(`Key pressed: ${key}`);
+            
+            if (key === ' ') {
+                showConstellations = !showConstellations;
+                console.log(`Constellations: ${showConstellations ? 'ON' : 'OFF'}`);
+            } 
+            else if (key === 'r' || key === 'R') {
+                regenerateCosmicRegion();
+                console.log("Cosmic region regenerated");
+            } 
+            else if (key === 't' || key === 'T') {
+                timeWarpActive = !timeWarpActive;
+                // Add visual feedback for time warp
+                for (let i = 0; i < stars.length; i += 10) {
+                    stars[i].twinkleSpeed *= random(0.2, 3);
+                }
+                console.log(`Time warp: ${timeWarpActive ? 'ON' : 'OFF'}`);
+            }
+            else if (key === 'c' || key === 'C') {
+                clearAllEffects();
+                console.log("All effects cleared");
+            }
+        }
+        
+        function regenerateCosmicRegion() {
+            let regionRadius = 120;
+            let mousePos = { x: mouseX, y: mouseY };
+            
+            // Remove stars in the region
+            let originalCount = stars.length;
+            stars = stars.filter(star => {
+                return dist(star.x, star.y, mousePos.x, mousePos.y) > regionRadius;
+            });
+            
+            let removedCount = originalCount - stars.length;
+            
+            // Add new stars in the region
+            for (let i = 0; i < removedCount + 20; i++) {
+                let angle = random(TWO_PI);
+                let radius = random(regionRadius * 0.8);
+                let newStar = createStar();
+                newStar.x = mousePos.x + cos(angle) * radius;
+                newStar.y = mousePos.y + sin(angle) * radius;
+                stars.push(newStar);
+            }
+            
+            // Create ripple to show effect
+            ripples.push({
+                x: mousePos.x,
+                y: mousePos.y,
+                radius: 0,
+                maxRadius: regionRadius * 2,
+                speed: 3,
+                strength: 0.8,
+                life: 1,
+                decay: 0.015
+            });
+        }
+        
+        function clearAllEffects() {
+            ripples = [];
+            constellationLines = [];
+            showConstellations = false;
+            timeWarpActive = false;
+            mouseInfluence.strength = 0;
+        }
+        
+        // Prevent context menu on right click
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>
